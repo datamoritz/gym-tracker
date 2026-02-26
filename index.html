@@ -39,7 +39,8 @@
             Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
             Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-4-4.5a7 7 0 1 0-13.5 1.5c-2.3.3-4 2.2-4 4.5C0.5 17 2.5 19 5 19h12.5z"/></svg>,
             ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
-            ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         };
 
         const App = () => {
@@ -53,19 +54,27 @@
             const [timeLeft, setTimeLeft] = useState(0);
             const [targetEndTime, setTargetEndTime] = useState(null);
             
+            // Notion State
             const [notionKey, setNotionKey] = useState(localStorage.getItem('notion_key') || '');
             const [notionDbId, setNotionDbId] = useState(localStorage.getItem('notion_db_id') || '');
             const [notionExercises, setNotionExercises] = useState(JSON.parse(localStorage.getItem('notion_exercises_cache') || '[]'));
             const [syncStatus, setSyncStatus] = useState('idle');
             const [errorMessage, setErrorMessage] = useState('');
+            const [showSavedFeedback, setShowSavedFeedback] = useState(false);
 
             const timerRef = useRef(null);
 
+            // Persist Routines automatically
             useEffect(() => {
                 localStorage.setItem('gym_routines', JSON.stringify(routines));
+            }, [routines]);
+
+            const saveCredentials = () => {
                 localStorage.setItem('notion_key', notionKey);
                 localStorage.setItem('notion_db_id', notionDbId);
-            }, [routines, notionKey, notionDbId]);
+                setShowSavedFeedback(true);
+                setTimeout(() => setShowSavedFeedback(false), 2000);
+            };
 
             const fetchExercisesFromNotion = async () => {
                 if (!notionKey || !notionDbId) {
@@ -115,12 +124,18 @@
                         const pauseStr = getText(p["Pause"]);
                         const weightStr = getText(p["Weight"]);
 
-                        // Logic for Weight range: e.g. "60-70-80" -> split by '-' and take first part (60)
+                        // Logic for Weight range: Find the lowest numerical value
                         let baseWeight = 0;
                         if (weightStr) {
-                            const firstPart = weightStr.split('-')[0].trim();
-                            const parsed = parseFloat(firstPart);
-                            if (!isNaN(parsed)) baseWeight = parsed;
+                            // Split by common delimiters like - or ,
+                            const parts = weightStr.split(/[- ,]/);
+                            const numbers = parts
+                                .map(p => parseFloat(p.trim()))
+                                .filter(n => !isNaN(n));
+                            
+                            if (numbers.length > 0) {
+                                baseWeight = Math.min(...numbers);
+                            }
                         }
 
                         return {
@@ -178,11 +193,19 @@
             if (view === 'settings') return (
                 <div className="min-h-screen bg-white">
                     <Header title="Settings" sub="Cloud Sync" />
-                    <main className="p-6 space-y-6">
+                    <main className="p-6 space-y-6 pb-32">
                         <div className="p-6 rounded-[32px] bg-slate-50 border border-slate-100 space-y-5">
-                            <div className="flex items-center gap-2 text-blue-600 mb-2">
-                                <Icons.Cloud />
-                                <span className="font-bold text-xs uppercase tracking-widest">Notion Integration</span>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2 text-blue-600">
+                                    <Icons.Cloud />
+                                    <span className="font-bold text-xs uppercase tracking-widest">Notion Integration</span>
+                                </div>
+                                {showSavedFeedback && (
+                                    <div className="flex items-center gap-1 text-green-600 animate-in fade-in slide-in-from-right-2">
+                                        <Icons.Check />
+                                        <span className="text-[10px] font-black uppercase tracking-tighter">Saved</span>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Internal Secret</label>
@@ -192,17 +215,30 @@
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Database ID</label>
                                 <input type="text" value={notionDbId} onChange={e => setNotionDbId(e.target.value)} placeholder="32-char ID" className="w-full p-4 bg-white rounded-2xl border border-slate-200 text-sm outline-none focus:border-blue-500" />
                             </div>
+                            
+                            <button 
+                                onClick={saveCredentials}
+                                className="w-full py-3 mt-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-widest active:bg-slate-50 transition-colors"
+                            >
+                                Save Configuration
+                            </button>
                         </div>
+
                         <button onClick={fetchExercisesFromNotion} disabled={syncStatus === 'syncing'} className="w-full py-5 bg-slate-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl shadow-slate-200">
                             {syncStatus === 'syncing' ? <div className="animate-spin h-5 w-5 border-2 border-white/20 border-t-white rounded-full" /> : 'Sync Notion Library'}
                         </button>
+
                         {syncStatus === 'error' && (
                             <div className="p-5 bg-red-50 rounded-2xl border border-red-100 space-y-3 text-center">
                                 <p className="text-[11px] text-red-500 font-semibold leading-relaxed">{errorMessage}</p>
-                                {errorMessage.includes("Proxy") && <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" className="block text-[10px] bg-red-600 text-white py-2 rounded-lg font-bold uppercase">Activate Proxy Access</a>}
+                                {errorMessage.includes("Proxy") && <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" className="block text-center text-[10px] bg-red-600 text-white py-2 rounded-lg font-bold uppercase">Activate Proxy Access</a>}
                             </div>
                         )}
                         {syncStatus === 'success' && <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-center text-green-600 font-bold text-xs uppercase tracking-widest">Library Synced!</div>}
+                        
+                        <div className="pt-4 px-2 italic text-[10px] text-slate-400 leading-relaxed">
+                            Tip: Once saved, your credentials stay in your browser's memory. You only need to re-sync when you update your Notion library.
+                        </div>
                     </main>
                 </div>
             );
