@@ -67,7 +67,7 @@
         
         @keyframes big-pulse {
             0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
+            50% { transform: scale(1.02); opacity: 0.9; }
             100% { transform: scale(1); opacity: 1; }
         }
         .timer-animate {
@@ -81,7 +81,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const VERSION = "v1.2.5"; 
+        const VERSION = "v1.2.6"; 
 
         const CONSTANTS = {
             EXERCISE_DB_ID: '2b3fe23d5e3c8011ac26d67c56e8309f',
@@ -405,23 +405,33 @@
                 const ex = activeRoutine.exercises[currentExerciseIndex];
                 const logged = workoutLog[ex.id] || [];
                 
-                // Progress calculation
                 const totalExercises = activeRoutine.exercises.length;
-                const progressPct = ((currentExerciseIndex + (logged.length / ex.targetSets)) / totalExercises) * 100;
+                const progressPct = ((currentExerciseIndex + (logged.length / Math.max(1, ex.targetSets))) / totalExercises) * 100;
 
                 const adjustWeight = (v) => setInputWeight(prev => Math.max(0, parseFloat(prev) + v));
                 const adjustReps = (v) => setInputReps(prev => Math.max(0, parseInt(prev) + v));
 
                 return (
-                    <div className="min-h-screen bg-[#131314] relative">
-                        {/* Session Progress Bar */}
+                    <div className="min-h-screen bg-[#131314] relative flex flex-col">
                         <div className="fixed top-0 left-0 right-0 z-[60] h-1.5 bg-[#28292c] safe-top">
                             <div className="h-full bg-[#8ab4f8] transition-all duration-500 ease-out" style={{ width: `${Math.min(progressPct, 100)}%` }} />
                         </div>
 
                         <Header title={ex.name} sub={`Move ${currentExerciseIndex + 1} of ${activeRoutine.exercises.length}`} />
                         
-                        <main className="p-6 space-y-8 pb-48">
+                        <main className="flex-1 p-6 space-y-6 pb-48 overflow-y-auto no-scrollbar">
+                            
+                            {/* NON-BLOCKING BIG TIMER SECTION */}
+                            {timerActive && (
+                                <div className="w-full py-8 dark-card rounded-[32px] flex flex-col items-center justify-center animate-in slide-in-from-top-4 duration-500 shadow-2xl border-[#8ab4f8]/20 bg-[#1e1f20]">
+                                    <div className="text-[#8ab4f8] uppercase tracking-[0.3em] font-black text-[10px] mb-2">Resting</div>
+                                    <div className="text-[90px] font-black text-white leading-none tabular-nums tracking-tighter timer-animate mb-6">
+                                        {Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,'0')}
+                                    </div>
+                                    <button onClick={() => {setTimerActive(false); setTargetEndTime(null);}} className="px-8 py-2.5 bg-[#28292c] text-[#e3e3e3] border border-[#3c4043] rounded-full font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all">Skip</button>
+                                </div>
+                            )}
+
                             <div className="flex gap-4">
                                 <div className="flex-1 space-y-4">
                                     <div className="p-6 dark-card rounded-[32px] text-center shadow-sm relative">
@@ -466,20 +476,6 @@
                             </div>
                         </main>
 
-                        {/* MASSIVE TIMER OVERLAY */}
-                        {timerActive && (
-                            <div className="fixed inset-0 z-[100] bg-[#131314]/95 flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
-                                <div className="text-[#8ab4f8] uppercase tracking-[0.3em] font-black text-sm mb-4">Recovery Mode</div>
-                                <div className="text-[180px] font-black text-white leading-none tabular-nums tracking-tighter timer-animate mb-12">
-                                    {Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,'0')}
-                                </div>
-                                <div className="flex flex-col w-full max-w-sm gap-4">
-                                    <button onClick={() => {setTimerActive(false); setTargetEndTime(null);}} className="w-full py-6 bg-white text-[#131314] rounded-[32px] font-black uppercase tracking-widest shadow-2xl active:scale-95 transition-all">Skip Rest Period</button>
-                                    <p className="text-[#9e9e9e] text-xs font-bold text-center italic">Take deep breaths. Your body is rebuilding.</p>
-                                </div>
-                            </div>
-                        )}
-
                         <footer className="fixed bottom-0 left-0 right-0 p-6 bg-[#131314]/95 backdrop-blur-xl border-t border-[#28292c] pb-12 flex gap-4 z-40 safe-bottom">
                             <button disabled={currentExerciseIndex === 0} onClick={() => setCurrentExerciseIndex(i => i-1)} className="w-16 h-16 bg-[#28292c] rounded-[20px] flex items-center justify-center text-[#9e9e9e] disabled:opacity-20 active:bg-[#3c4043]">
                                 <Icons.ChevronLeft />
@@ -491,7 +487,7 @@
                                     setCurrentExerciseIndex(i => i + 1); setTimerActive(false); setTargetEndTime(null);
                                 }
                             }} className={`flex-1 ${isLogging ? 'bg-amber-500' : 'bg-[#8ab4f8]'} text-[#131314] rounded-[20px] font-bold flex items-center justify-center gap-2 active:bg-[#a6c7f9] uppercase tracking-widest text-[11px] shadow-lg`}>
-                                {isLogging ? 'Saving Workout...' : (currentExerciseIndex === activeRoutine.exercises.length - 1 ? 'Finish Workout' : 'Next Move')} 
+                                {isLogging ? 'Syncing...' : (currentExerciseIndex === activeRoutine.exercises.length - 1 ? 'Finish Session' : 'Next Exercise')} 
                                 {!isLogging && <Icons.ChevronRight />}
                             </button>
                         </footer>
