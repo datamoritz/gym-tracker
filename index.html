@@ -16,6 +16,7 @@
             color: #0f172a;
         }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
         .safe-top { padding-top: env(safe-area-inset-top); }
         .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
         .animate-pulse-subtle { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
@@ -96,13 +97,41 @@
                     if (!response.ok) throw new Error("Notion rejected connection. Check Key/ID.");
                     
                     const data = await response.json();
-                    const fetched = data.results.map(page => ({
-                        id: page.id,
-                        name: page.properties["Exercise Name"]?.title?.[0]?.plain_text || "Untitled",
-                        tag: page.properties["Routine"]?.select?.name || "",
-                        sets: page.properties["Sets"]?.number || 3,
-                        pause: page.properties["Pause"]?.number || 90
-                    })).filter(ex => ex.name !== "Untitled");
+                    
+                    const fetched = data.results.map(page => {
+                        const p = page.properties;
+                        
+                        // Helper to safely get text from Notion properties
+                        const getText = (prop) => {
+                            if (!prop) return "";
+                            if (prop.type === 'title') return prop.title[0]?.plain_text || "";
+                            if (prop.type === 'rich_text') return prop.rich_text[0]?.plain_text || "";
+                            if (prop.type === 'number') return prop.number?.toString() || "";
+                            return "";
+                        };
+
+                        const name = getText(p["Exercise Name"]);
+                        const setsStr = getText(p["Sets"]);
+                        const pauseStr = getText(p["Pause"]);
+                        const weightStr = getText(p["Weight"]);
+
+                        // Logic for Weight range: e.g. "60-70-80" -> split by '-' and take first part (60)
+                        let baseWeight = 0;
+                        if (weightStr) {
+                            const firstPart = weightStr.split('-')[0].trim();
+                            const parsed = parseFloat(firstPart);
+                            if (!isNaN(parsed)) baseWeight = parsed;
+                        }
+
+                        return {
+                            id: page.id,
+                            name: name || "Untitled",
+                            tag: p["Routine"]?.select?.name || "",
+                            sets: parseInt(setsStr) || 3,
+                            pause: parseInt(pauseStr) || 90,
+                            weight: baseWeight
+                        };
+                    }).filter(ex => ex.name !== "Untitled");
                     
                     setNotionExercises(fetched);
                     localStorage.setItem('notion_exercises_cache', JSON.stringify(fetched));
@@ -168,9 +197,9 @@
                             {syncStatus === 'syncing' ? <div className="animate-spin h-5 w-5 border-2 border-white/20 border-t-white rounded-full" /> : 'Sync Notion Library'}
                         </button>
                         {syncStatus === 'error' && (
-                            <div className="p-5 bg-red-50 rounded-2xl border border-red-100 space-y-3">
-                                <p className="text-[11px] text-red-500 font-semibold text-center leading-relaxed">{errorMessage}</p>
-                                {errorMessage.includes("Proxy") && <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" className="block text-center text-[10px] bg-red-600 text-white py-2 rounded-lg font-bold uppercase">Activate Proxy Access</a>}
+                            <div className="p-5 bg-red-50 rounded-2xl border border-red-100 space-y-3 text-center">
+                                <p className="text-[11px] text-red-500 font-semibold leading-relaxed">{errorMessage}</p>
+                                {errorMessage.includes("Proxy") && <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" className="block text-[10px] bg-red-600 text-white py-2 rounded-lg font-bold uppercase">Activate Proxy Access</a>}
                             </div>
                         )}
                         {syncStatus === 'success' && <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-center text-green-600 font-bold text-xs uppercase tracking-widest">Library Synced!</div>}
@@ -184,7 +213,7 @@
                     <main className="p-6 space-y-4 pb-32">
                         {routines.map(r => (
                             <div key={r.id} className="p-6 rounded-[32px] bg-slate-50 border border-slate-100 flex items-center justify-between shadow-sm active:bg-slate-100 transition-colors">
-                                <div>
+                                <div className="flex-1">
                                     <h3 className="text-lg font-bold text-slate-900 leading-tight">{r.name}</h3>
                                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{r.exercises.length} Exercises</p>
                                 </div>
@@ -217,7 +246,7 @@
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {notionExercises.map((ex, i) => (
-                                    <button key={i} onClick={() => setActiveRoutine({...activeRoutine, exercises: [...activeRoutine.exercises, {id:Math.random().toString(36).substr(2,9), name:ex.name, defaultPause:ex.pause, targetSets:ex.sets}]})} className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 active:bg-blue-600 active:text-white flex items-center gap-2 transition-all">
+                                    <button key={i} onClick={() => setActiveRoutine({...activeRoutine, exercises: [...activeRoutine.exercises, {id:Math.random().toString(36).substr(2,9), name:ex.name, defaultPause:ex.pause, targetSets:ex.sets, suggestedWeight: ex.weight}]})} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 active:bg-blue-600 active:text-white flex items-center gap-2 transition-all">
                                         <span className="bg-slate-200 px-1 rounded text-[9px] text-slate-500 font-black">{ex.tag}</span> {ex.name}
                                     </button>
                                 ))}
@@ -226,17 +255,20 @@
 
                         <div className="space-y-3">
                             {activeRoutine.exercises.map((ex, i) => (
-                                <div key={ex.id} className="p-5 bg-slate-50 border border-slate-100 rounded-[28px] space-y-4">
+                                <div key={ex.id} className="p-4 bg-slate-50 border border-slate-100 rounded-[24px] space-y-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="font-bold text-slate-900 text-sm tracking-tight">{ex.name}</span>
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-slate-900 text-sm tracking-tight leading-none mb-1">{ex.name}</span>
+                                            {ex.suggestedWeight > 0 && <span className="text-[9px] text-blue-500 font-bold uppercase">Suggested: {ex.suggestedWeight}kg</span>}
+                                        </div>
                                         <button onClick={() => { const n={...activeRoutine}; n.exercises.splice(i,1); setActiveRoutine(n); }} className="p-2 text-slate-300 active:text-red-500"><Icons.Trash /></button>
                                     </div>
                                     <div className="flex gap-2">
-                                        <div className="flex-1 bg-white p-3 rounded-2xl text-center border border-slate-100">
+                                        <div className="flex-1 bg-white p-2 rounded-xl text-center border border-slate-100">
                                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5 tracking-tighter">Pause (s)</span>
                                             <input type="number" value={ex.defaultPause} onChange={e => { const n={...activeRoutine}; n.exercises[i].defaultPause=parseInt(e.target.value); setActiveRoutine(n); }} className="font-bold text-center w-full outline-none text-sm text-slate-900" />
                                         </div>
-                                        <div className="flex-1 bg-white p-3 rounded-2xl text-center border border-slate-100">
+                                        <div className="flex-1 bg-white p-2 rounded-xl text-center border border-slate-100">
                                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5 tracking-tighter">Sets</span>
                                             <input type="number" value={ex.targetSets} onChange={e => { const n={...activeRoutine}; n.exercises[i].targetSets=parseInt(e.target.value); setActiveRoutine(n); }} className="font-bold text-center w-full outline-none text-sm text-slate-900" />
                                         </div>
@@ -261,7 +293,7 @@
                             <div className="flex gap-4">
                                 <div className="flex-1 p-6 bg-slate-50 border border-slate-100 rounded-[32px] text-center shadow-sm">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Weight</span>
-                                    <input id="wi" type="number" step="0.5" defaultValue={logged.length > 0 ? logged[logged.length-1].w : 0} className="text-4xl font-bold bg-transparent w-full text-center outline-none text-slate-900" />
+                                    <input id="wi" type="number" step="0.5" defaultValue={logged.length > 0 ? logged[logged.length-1].w : (ex.suggestedWeight || 0)} className="text-4xl font-bold bg-transparent w-full text-center outline-none text-slate-900" />
                                 </div>
                                 <div className="flex-1 p-6 bg-slate-50 border border-slate-100 rounded-[32px] text-center shadow-sm">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Reps</span>
