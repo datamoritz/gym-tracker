@@ -2,29 +2,44 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Pulse Gym Tracker</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/lucide-static@0.321.0/font/lucide.min.css" rel="stylesheet">
     <style>
-        body { -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { 
+            -webkit-tap-highlight-color: transparent; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #0f172a;
+        }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .safe-top { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        .animate-pulse-subtle { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
     </style>
 </head>
-<body class="bg-white">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // Simple Icon Component for standalone HTML
-        const Icon = ({ name, size = 20, className = "" }) => (
-            <i className={`lucide-${name} ${className}`} style={{ fontSize: size }}></i>
-        );
+        // Optimized SVG Icons for Pulse UI
+        const Icons = {
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+            Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-4-4.5a7 7 0 1 0-13.5 1.5c-2.3.3-4 2.2-4 4.5C0.5 17 2.5 19 5 19h12.5z"/></svg>,
+            ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+            ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        };
 
         const App = () => {
             const [view, setView] = useState('home');
@@ -32,6 +47,7 @@
             const [activeRoutine, setActiveRoutine] = useState(null);
             const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
             const [workoutLog, setWorkoutLog] = useState({});
+            
             const [timerActive, setTimerActive] = useState(false);
             const [timeLeft, setTimeLeft] = useState(0);
             const [targetEndTime, setTargetEndTime] = useState(null);
@@ -51,19 +67,34 @@
             }, [routines, notionKey, notionDbId]);
 
             const fetchExercisesFromNotion = async () => {
+                if (!notionKey || !notionDbId) {
+                    setErrorMessage("Missing API Key or Database ID.");
+                    setSyncStatus('error');
+                    return;
+                }
                 setSyncStatus('syncing');
+                setErrorMessage('');
+                
                 try {
-                    const proxyUrl = "https://cors-anywhere.herokuapp.com/";
-                    const response = await fetch(proxyUrl + `https://api.notion.com/v1/databases/${notionDbId}/query`, {
+                    const proxyUrl = "https://cors-anywhere.herokuapp.com/"; 
+                    const apiUrl = `https://api.notion.com/v1/databases/${notionDbId}/query`;
+                    
+                    const response = await fetch(proxyUrl + apiUrl, {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${notionKey}`,
                             'Notion-Version': '2022-06-28',
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
                         },
-                        body: JSON.stringify({ filter: { property: "Routine", select: { is_not_empty: true } } })
+                        body: JSON.stringify({
+                            filter: { property: "Routine", select: { is_not_empty: true } }
+                        })
                     });
-                    if (!response.ok) throw new Error("Failed to connect. Check Secret/ID and Proxy.");
+
+                    if (response.status === 403) throw new Error("CORS Proxy Access Expired. Visit cors-anywhere.herokuapp.com/corsdemo");
+                    if (!response.ok) throw new Error("Notion rejected connection. Check Key/ID.");
+                    
                     const data = await response.json();
                     const fetched = data.results.map(page => ({
                         id: page.id,
@@ -71,15 +102,31 @@
                         tag: page.properties["Routine"]?.select?.name || "",
                         sets: page.properties["Sets"]?.number || 3,
                         pause: page.properties["Pause"]?.number || 90
-                    }));
+                    })).filter(ex => ex.name !== "Untitled");
+                    
                     setNotionExercises(fetched);
                     localStorage.setItem('notion_exercises_cache', JSON.stringify(fetched));
                     setSyncStatus('success');
+                    setTimeout(() => setSyncStatus('idle'), 3000);
                 } catch (err) {
                     setErrorMessage(err.message);
                     setSyncStatus('error');
                 }
             };
+
+            useEffect(() => {
+                if (timerActive && targetEndTime) {
+                    timerRef.current = setInterval(() => {
+                        const remaining = Math.max(0, Math.ceil((targetEndTime - Date.now()) / 1000));
+                        setTimeLeft(remaining);
+                        if (remaining <= 0) {
+                            setTimerActive(false);
+                            setTargetEndTime(null);
+                        }
+                    }, 500);
+                }
+                return () => clearInterval(timerRef.current);
+            }, [timerActive, targetEndTime]);
 
             const startTimer = (seconds) => {
                 setTargetEndTime(Date.now() + (seconds * 1000));
@@ -87,87 +134,119 @@
                 setTimerActive(true);
             };
 
-            useEffect(() => {
-                if (timerActive) {
-                    timerRef.current = setInterval(() => {
-                        const remaining = Math.max(0, Math.ceil((targetEndTime - Date.now()) / 1000));
-                        setTimeLeft(remaining);
-                        if (remaining <= 0) setTimerActive(false);
-                    }, 500);
-                }
-                return () => clearInterval(timerRef.current);
-            }, [timerActive, targetEndTime]);
-
             const Header = ({ title, sub }) => (
-                <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-100 px-6 pt-12 pb-4 flex justify-between items-end">
+                <header className="bg-white/90 backdrop-blur-md border-b border-slate-100 pt-14 pb-5 px-6 sticky top-0 z-50 flex justify-between items-end safe-top">
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900">{title}</h1>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{sub}</p>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{title}</h1>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{sub}</p>
                     </div>
-                    <button onClick={() => setView(view === 'home' ? 'settings' : 'home')} className="p-2 bg-slate-50 rounded-full text-slate-400">
-                        <Icon name={view === 'home' ? 'settings-2' : 'x'} size={18} />
+                    <button onClick={() => setView(view === 'home' ? 'settings' : 'home')} className="p-3 bg-slate-50 text-slate-400 rounded-full active:bg-slate-200 transition-colors">
+                        {view === 'home' ? <Icons.Settings /> : <Icons.X />}
                     </button>
                 </header>
             );
 
             if (view === 'settings') return (
-                <div className="min-h-screen bg-white pb-20">
-                    <Header title="Settings" sub="Configurations" />
-                    <div className="p-6 space-y-4">
-                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
-                            <input type="password" value={notionKey} onChange={e => setNotionKey(e.target.value)} placeholder="Notion Secret" className="w-full p-3 rounded-xl border border-slate-200 text-sm" />
-                            <input type="text" value={notionDbId} onChange={e => setNotionDbId(e.target.value)} placeholder="Database ID" className="w-full p-3 rounded-xl border border-slate-200 text-sm" />
+                <div className="min-h-screen bg-white">
+                    <Header title="Settings" sub="Cloud Sync" />
+                    <main className="p-6 space-y-6">
+                        <div className="p-6 rounded-[32px] bg-slate-50 border border-slate-100 space-y-5">
+                            <div className="flex items-center gap-2 text-blue-600 mb-2">
+                                <Icons.Cloud />
+                                <span className="font-bold text-xs uppercase tracking-widest">Notion Integration</span>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Internal Secret</label>
+                                <input type="password" value={notionKey} onChange={e => setNotionKey(e.target.value)} placeholder="secret_..." className="w-full p-4 bg-white rounded-2xl border border-slate-200 text-sm outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Database ID</label>
+                                <input type="text" value={notionDbId} onChange={e => setNotionDbId(e.target.value)} placeholder="32-char ID" className="w-full p-4 bg-white rounded-2xl border border-slate-200 text-sm outline-none focus:border-blue-500" />
+                            </div>
                         </div>
-                        <button onClick={fetchExercisesFromNotion} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
-                            {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Library'}
+                        <button onClick={fetchExercisesFromNotion} disabled={syncStatus === 'syncing'} className="w-full py-5 bg-slate-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl shadow-slate-200">
+                            {syncStatus === 'syncing' ? <div className="animate-spin h-5 w-5 border-2 border-white/20 border-t-white rounded-full" /> : 'Sync Notion Library'}
                         </button>
-                        {syncStatus === 'error' && <p className="text-red-500 text-[10px] text-center">{errorMessage}</p>}
-                    </div>
+                        {syncStatus === 'error' && (
+                            <div className="p-5 bg-red-50 rounded-2xl border border-red-100 space-y-3">
+                                <p className="text-[11px] text-red-500 font-semibold text-center leading-relaxed">{errorMessage}</p>
+                                {errorMessage.includes("Proxy") && <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" className="block text-center text-[10px] bg-red-600 text-white py-2 rounded-lg font-bold uppercase">Activate Proxy Access</a>}
+                            </div>
+                        )}
+                        {syncStatus === 'success' && <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-center text-green-600 font-bold text-xs uppercase tracking-widest">Library Synced!</div>}
+                    </main>
                 </div>
             );
 
             if (view === 'home') return (
                 <div className="min-h-screen bg-white">
                     <Header title="Pulse" sub="Workouts" />
-                    <div className="p-6 space-y-3">
+                    <main className="p-6 space-y-4 pb-32">
                         {routines.map(r => (
-                            <div key={r.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
-                                <div><h3 className="font-bold text-slate-800 text-sm">{r.name}</h3><p className="text-[10px] text-slate-400">{r.exercises.length} Exercises</p></div>
+                            <div key={r.id} className="p-6 rounded-[32px] bg-slate-50 border border-slate-100 flex items-center justify-between shadow-sm active:bg-slate-100 transition-colors">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 leading-tight">{r.name}</h3>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{r.exercises.length} Exercises</p>
+                                </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => { setActiveRoutine(r); setView('planner'); }} className="p-2 text-slate-300"><Icon name="settings-2" size={16}/></button>
-                                    <button onClick={() => { setActiveRoutine(r); setCurrentExerciseIndex(0); setView('active'); }} className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center"><Icon name="play" size={16}/></button>
+                                    <button onClick={() => { setActiveRoutine(r); setView('planner'); }} className="p-3 text-slate-300 active:text-slate-600"><Icons.Settings /></button>
+                                    <button onClick={() => { setActiveRoutine(r); setCurrentExerciseIndex(0); setWorkoutLog({}); setView('active'); }} className="w-12 h-12 bg-blue-600 text-white rounded-[20px] flex items-center justify-center shadow-lg shadow-blue-100 active:scale-90 transition-transform">
+                                        <Icons.Play />
+                                    </button>
                                 </div>
                             </div>
                         ))}
-                        <button onClick={() => { const nr={id:Date.now(),name:"New Protocol",exercises:[]}; setRoutines([...routines,nr]); setActiveRoutine(nr); setView('planner'); }} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-300 flex items-center justify-center gap-2"><Icon name="plus" size={18} /><span className="text-xs font-bold uppercase">New</span></button>
-                    </div>
+                        <button onClick={() => { const nr={id:Date.now(), name:"New Routine", exercises:[]}; setRoutines([...routines, nr]); setActiveRoutine(nr); setView('planner'); }} className="w-full py-12 border-2 border-dashed border-slate-200 rounded-[32px] flex flex-col items-center gap-2 text-slate-300 active:bg-slate-50 transition-all">
+                            <Icons.Plus />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Create Routine</span>
+                        </button>
+                    </main>
                 </div>
             );
 
             if (view === 'planner') return (
-                <div className="min-h-screen bg-white pb-32">
+                <div className="min-h-screen bg-white pb-48">
                     <Header title="Planner" sub="Sequence" />
-                    <div className="p-6 space-y-6">
-                        <input value={activeRoutine.name} onChange={e => setActiveRoutine({...activeRoutine, name: e.target.value})} className="text-xl font-bold w-full outline-none" />
-                        <div className="flex flex-wrap gap-2">
-                            {notionExercises.map((ex, i) => (
-                                <button key={i} onClick={() => setActiveRoutine({...activeRoutine, exercises: [...activeRoutine.exercises, {id:Math.random(), name:ex.name, defaultPause:ex.pause, targetSets:ex.sets}]})} className="px-2 py-1 bg-slate-50 text-[10px] font-bold rounded-lg border border-slate-100">{ex.name}</button>
-                            ))}
-                        </div>
-                        <div className="space-y-2">
+                    <main className="p-6 space-y-8">
+                        <input value={activeRoutine.name} onChange={e => setActiveRoutine({...activeRoutine, name: e.target.value})} className="text-3xl font-bold text-slate-900 border-none outline-none w-full tracking-tight" placeholder="Routine Name" />
+                        
+                        <section>
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Library</h4>
+                                {notionExercises.length === 0 && <button onClick={() => setView('settings')} className="text-[10px] text-blue-600 font-bold uppercase">Sync Notion First</button>}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {notionExercises.map((ex, i) => (
+                                    <button key={i} onClick={() => setActiveRoutine({...activeRoutine, exercises: [...activeRoutine.exercises, {id:Math.random().toString(36).substr(2,9), name:ex.name, defaultPause:ex.pause, targetSets:ex.sets}]})} className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 active:bg-blue-600 active:text-white flex items-center gap-2 transition-all">
+                                        <span className="bg-slate-200 px-1 rounded text-[9px] text-slate-500 font-black">{ex.tag}</span> {ex.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+
+                        <div className="space-y-3">
                             {activeRoutine.exercises.map((ex, i) => (
-                                <div key={ex.id} className="p-3 bg-white border border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
-                                    <span className="text-xs font-bold">{ex.name}</span>
-                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold">
-                                        <span>{ex.targetSets} sets</span>
-                                        <button onClick={() => { const n={...activeRoutine}; n.exercises.splice(i,1); setActiveRoutine(n); }}><Icon name="trash-2" size={14}/></button>
+                                <div key={ex.id} className="p-5 bg-slate-50 border border-slate-100 rounded-[28px] space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-bold text-slate-900 text-sm tracking-tight">{ex.name}</span>
+                                        <button onClick={() => { const n={...activeRoutine}; n.exercises.splice(i,1); setActiveRoutine(n); }} className="p-2 text-slate-300 active:text-red-500"><Icons.Trash /></button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 bg-white p-3 rounded-2xl text-center border border-slate-100">
+                                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5 tracking-tighter">Pause (s)</span>
+                                            <input type="number" value={ex.defaultPause} onChange={e => { const n={...activeRoutine}; n.exercises[i].defaultPause=parseInt(e.target.value); setActiveRoutine(n); }} className="font-bold text-center w-full outline-none text-sm text-slate-900" />
+                                        </div>
+                                        <div className="flex-1 bg-white p-3 rounded-2xl text-center border border-slate-100">
+                                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5 tracking-tighter">Sets</span>
+                                            <input type="number" value={ex.targetSets} onChange={e => { const n={...activeRoutine}; n.exercises[i].targetSets=parseInt(e.target.value); setActiveRoutine(n); }} className="font-bold text-center w-full outline-none text-sm text-slate-900" />
+                                        </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                    <footer className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-50 pb-10">
-                        <button onClick={() => { setRoutines(routines.map(r => r.id === activeRoutine.id ? activeRoutine : r)); setView('home'); }} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold">Save Protocol</button>
+                    </main>
+                    <footer className="fixed bottom-0 left-0 right-0 p-6 bg-white/90 backdrop-blur-md border-t border-slate-100 pb-12 z-50 safe-bottom">
+                        <button onClick={() => { setRoutines(routines.map(r => r.id === activeRoutine.id ? activeRoutine : r)); setView('home'); }} className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-bold shadow-xl shadow-blue-50 active:scale-95 transition-all">Save Changes</button>
                     </footer>
                 </div>
             );
@@ -177,24 +256,45 @@
                 const logged = workoutLog[ex.id] || [];
                 return (
                     <div className="min-h-screen bg-white">
-                        <Header title={ex.name} sub={`Step ${currentExerciseIndex+1}/${activeRoutine.exercises.length}`} />
-                        <div className="p-6 space-y-6">
-                            <div className="flex gap-3">
-                                <div className="flex-1 bg-slate-50 p-4 rounded-2xl text-center"><span className="text-[10px] font-bold block mb-1">KG</span><input id="wi" type="number" defaultValue="0" className="bg-transparent text-2xl font-bold w-full text-center outline-none" /></div>
-                                <div className="flex-1 bg-slate-50 p-4 rounded-2xl text-center"><span className="text-[10px] font-bold block mb-1">REPS</span><input id="ri" type="number" defaultValue="10" className="bg-transparent text-2xl font-bold w-full text-center outline-none" /></div>
+                        <Header title={ex.name} sub={`Step ${currentExerciseIndex + 1} of ${activeRoutine.exercises.length}`} />
+                        <main className="p-6 flex-1 flex flex-col gap-8 pb-48 overflow-y-auto no-scrollbar">
+                            <div className="flex gap-4">
+                                <div className="flex-1 p-6 bg-slate-50 border border-slate-100 rounded-[32px] text-center shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Weight</span>
+                                    <input id="wi" type="number" step="0.5" defaultValue={logged.length > 0 ? logged[logged.length-1].w : 0} className="text-4xl font-bold bg-transparent w-full text-center outline-none text-slate-900" />
+                                </div>
+                                <div className="flex-1 p-6 bg-slate-50 border border-slate-100 rounded-[32px] text-center shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Reps</span>
+                                    <input id="ri" type="number" defaultValue={logged.length > 0 ? logged[logged.length-1].r : 10} className="text-4xl font-bold bg-transparent w-full text-center outline-none text-slate-900" />
+                                </div>
                             </div>
                             <button onClick={() => { 
-                                const n = {...workoutLog}; if(!n[ex.id]) n[ex.id]=[]; n[ex.id].push({w:document.getElementById('wi').value, r:document.getElementById('ri').value});
+                                const n = {...workoutLog}; if(!n[ex.id]) n[ex.id]=[]; 
+                                n[ex.id].push({w:document.getElementById('wi').value, r:document.getElementById('ri').value});
                                 setWorkoutLog(n); startTimer(ex.defaultPause);
-                            }} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold">Log Set {logged.length + 1}</button>
-                            <div className="flex flex-wrap gap-2">
-                                {logged.map((s,i) => <div key={i} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-100">{s.w}kg x {s.r}</div>)}
+                            }} className="w-full py-6 bg-slate-900 text-white rounded-[28px] font-bold text-lg shadow-xl active:scale-[0.96] transition-all">Log Set {logged.length + 1}</button>
+                            <div className="flex flex-wrap gap-2.5">
+                                {logged.map((s, i) => (
+                                    <div key={i} className="px-5 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[11px] font-bold border border-blue-100 animate-in fade-in zoom-in-95">Set {i+1}: {s.w}kg × {s.r}</div>
+                                ))}
                             </div>
-                        </div>
-                        {timerActive && <div className="fixed bottom-32 left-6 right-6 bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center"><span className="font-mono text-xl">{Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,'0')}</span><button onClick={()=>setTimerActive(false)} className="text-[10px] font-bold uppercase">Skip</button></div>}
-                        <footer className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-50 pb-10 flex gap-2">
-                            <button disabled={currentExerciseIndex===0} onClick={()=>setCurrentExerciseIndex(i=>i-1)} className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center text-slate-300"><Icon name="chevron-left" /></button>
-                            <button onClick={()=>currentExerciseIndex===activeRoutine.exercises.length-1?setView('home'):(setCurrentExerciseIndex(i=>i+1),setTimerActive(false))} className="flex-1 bg-slate-100 rounded-xl font-bold">{currentExerciseIndex===activeRoutine.exercises.length-1?'Finish':'Next'}</button>
+                        </main>
+                        {timerActive && (
+                            <div className="fixed bottom-36 left-6 right-6 bg-slate-900 text-white p-5 rounded-[28px] shadow-2xl flex items-center justify-between z-50 animate-in fade-in slide-in-from-bottom-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="animate-pulse-subtle"><Icons.Clock /></div>
+                                    <span className="font-mono text-2xl font-bold tracking-tighter tabular-nums">{Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,'0')}</span>
+                                </div>
+                                <button onClick={() => {setTimerActive(false); setTargetEndTime(null);}} className="text-[10px] font-bold uppercase tracking-widest bg-white/10 px-4 py-2 rounded-xl active:bg-white/20">Skip</button>
+                            </div>
+                        )}
+                        <footer className="fixed bottom-0 left-0 right-0 p-6 bg-white/95 backdrop-blur-xl border-t border-slate-100 pb-12 flex gap-4 z-40 safe-bottom">
+                            <button disabled={currentExerciseIndex === 0} onClick={() => setCurrentExerciseIndex(i => i-1)} className="w-16 h-16 bg-slate-50 rounded-[20px] flex items-center justify-center text-slate-300 disabled:opacity-20 active:bg-slate-200 transition-colors">
+                                <Icons.ChevronLeft />
+                            </button>
+                            <button onClick={() => currentExerciseIndex === activeRoutine.exercises.length - 1 ? setView('home') : (setCurrentExerciseIndex(i => i + 1), setTimerActive(false), setTargetEndTime(null))} className="flex-1 bg-blue-600 text-white rounded-[20px] font-bold flex items-center justify-center gap-2 active:bg-blue-700 transition-colors uppercase tracking-widest text-[11px] italic shadow-lg shadow-blue-100">
+                                {currentExerciseIndex === activeRoutine.exercises.length - 1 ? 'Finish Session' : 'Next Exercise'} <Icons.ChevronRight />
+                            </button>
                         </footer>
                     </div>
                 );
